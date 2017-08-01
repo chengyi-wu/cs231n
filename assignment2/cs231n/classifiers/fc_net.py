@@ -244,7 +244,25 @@ class FullyConnectedNet(object):
         # beta2, etc. Scale parameters should be initialized to one and shift      #
         # parameters should be initialized to zero.                                #
         ############################################################################
-        pass
+        # pass
+        
+        for i, h in enumerate(hidden_dims):
+            if i == 0:
+                row = input_dim
+                col = h
+            elif i == len(hidden_dims) - 1:
+                row = h
+                col = num_classes
+            else:
+                row = hidden_dims[i - 1]
+                col = h
+
+            w = np.random.normal(loc=0.0, scale=weight_scale, size=row * col).reshape((row, col))
+            
+            b = np.zeros((1, h))
+
+            self.params['W' + str(i + 1)] = w
+            self.params['b' + str(i + 1)] = b 
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -302,7 +320,21 @@ class FullyConnectedNet(object):
         # self.bn_params[1] to the forward pass for the second batch normalization #
         # layer, etc.                                                              #
         ############################################################################
-        pass
+        # pass
+        # {affine - [batch norm] - relu - [dropout]} x (L - 1) - affine - softmax
+        reg = self.reg
+        reg_loss = 0
+        for i in range(self.num_layers - 1):
+            W = self.params['W' + str(i + 1)]
+            b = self.params['b' + str(i + 1)]
+            print(W, b)
+            reg_loss = reg * W
+            if i == 0:
+                fc_out, fc_cache = affine_forward(X, W, b)
+                relu_out, relu_cache = relu_forward(fc_out)
+            else:
+                fc_out, fc_cache = affine_forward(relu_out, W, b)
+                relu_out, relu_cache = relu_forward(fc_out)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -325,7 +357,9 @@ class FullyConnectedNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        pass
+        # pass
+        data_loss, df = softmax_loss(scores, y)
+        loss = data_loss + reg_loss
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
