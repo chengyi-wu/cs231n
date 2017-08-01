@@ -38,7 +38,7 @@ def affine_forward(x, w, b):
     # out = np.array(out)
     # out.reshape(row, - 1)
     N = x.shape[0]
-    out = x.reshape(N, -1).dot(w) + b
+    out = x.copy().reshape(N, -1).dot(w) + b
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -72,12 +72,12 @@ def affine_backward(dout, cache):
     # dfdw = x # (N, d1, ..., d_k)
 
     # local gradients
-    dfdx = w
-    dfdw = x 
+    dfdx = w.copy()
+    dfdw = x.copy()
     dfdb = 1
 
     # global gradients received from upper layer 
-    doutdf = dout
+    doutdf = dout.copy()
 
     # number of items
     N = doutdf.shape[0]
@@ -118,7 +118,8 @@ def relu_forward(x):
     # TODO: Implement the ReLU forward pass.                                  #
     ###########################################################################
     # pass
-    out = np.maximum(0, x)
+    out = x.copy()
+    out = np.maximum(0, out)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -142,8 +143,15 @@ def relu_backward(dout, cache):
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
     # pass
-    dx = dout
-    dx[x < 0] = 0
+
+    ind = x.copy()
+    ind = np.maximum(0, ind)
+    ind[ind > 0] = 1
+
+    dx = dout * ind
+
+    # dx = dout.copy()
+    # dx[x < 0] = 0
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################

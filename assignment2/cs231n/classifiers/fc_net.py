@@ -118,11 +118,11 @@ class TwoLayerNet(object):
         W2, b2 = self.params['W2'], self.params['b2']
 
         # hidden, (fc_cache, relu_cache) = affine_relu_forward(X, W1, b1)
-        affine_output, affine_cache = affine_forward(X, W1, b1)
+        fc_out, fc_cache = affine_forward(X, W1, b1)
 
-        relu_ouput, relu_cache = relu_forward(affine_output)
+        relu_out, relu_cache = relu_forward(fc_out)
         
-        scores = relu_ouput.dot(W2) + b2
+        scores, scores_cache = affine_forward(relu_out, W2, b2)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -151,8 +151,9 @@ class TwoLayerNet(object):
         # dW2: (H, C)
         # hidden: (N, H)
 
-        dW2 = relu_ouput.T.dot(df)
-        db2 = np.sum(df, axis=0)
+        # dW2 = relu_ouput.T.dot(df)
+        df, dW2, db2 = affine_backward(df, scores_cache)
+        # db2 = np.sum(df, axis=0)
 
         grads['W2'] = dW2 + reg * W2
         grads['b2'] = db2
@@ -172,10 +173,10 @@ class TwoLayerNet(object):
         db1 = np.sum(df, axis=0)
         '''
         # consider the relationship between delta2 and delta3, backward of relu
-        df = df.dot(W2.T)
+        # df = df.dot(W2.T)
         df = relu_backward(df, relu_cache)
 
-        df, dW1, db1 = affine_backward(df, affine_cache)
+        df, dW1, db1 = affine_backward(df, fc_cache)
         
         grads['W1'] = dW1 + reg * W1
         grads['b1'] = db1
@@ -246,23 +247,25 @@ class FullyConnectedNet(object):
         ############################################################################
         # pass
         
-        for i, h in enumerate(hidden_dims):
+        for i in range(self.num_layers):
             if i == 0:
                 row = input_dim
-                col = h
-            elif i == len(hidden_dims) - 1:
-                row = h
-                col = num_classes
             else:
                 row = hidden_dims[i - 1]
-                col = h
-
-            w = np.random.normal(loc=0.0, scale=weight_scale, size=row * col).reshape((row, col))
             
-            b = np.zeros((1, h))
+            if i == self.num_layers - 1:
+                col = num_classes
+            else:
+                col = hidden_dims[i]
 
-            self.params['W' + str(i + 1)] = w
+            W = np.random.normal(loc=0.0, scale=weight_scale, size=row * col).reshape((row, col))
+            
+            b = np.zeros((1, col))
+
+            self.params['W' + str(i + 1)] = W
             self.params['b' + str(i + 1)] = b 
+        # for name in sorted(self.params):
+        #     print(name, self.params[name].shape)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -324,17 +327,23 @@ class FullyConnectedNet(object):
         # {affine - [batch norm] - relu - [dropout]} x (L - 1) - affine - softmax
         reg = self.reg
         reg_loss = 0
-        for i in range(self.num_layers - 1):
+        self.cache = {}
+        for i in range(self.num_layers):
             W = self.params['W' + str(i + 1)]
             b = self.params['b' + str(i + 1)]
-            print(W, b)
-            reg_loss = reg * W
+            reg_loss += 0.5 * reg * np.sum(W * W)
             if i == 0:
                 fc_out, fc_cache = affine_forward(X, W, b)
                 relu_out, relu_cache = relu_forward(fc_out)
+            elif i == self.num_layers - 1:
+                fc_out, fc_cache = affine_forward(relu_out, W, b)
+                relu_out, relu_cache = None, None
             else:
                 fc_out, fc_cache = affine_forward(relu_out, W, b)
                 relu_out, relu_cache = relu_forward(fc_out)
+            self.cache['cache' + str(i + 1)] = (fc_cache, relu_cache)
+
+        scores = fc_out
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -360,6 +369,18 @@ class FullyConnectedNet(object):
         # pass
         data_loss, df = softmax_loss(scores, y)
         loss = data_loss + reg_loss
+
+        # {affine - [batch norm] - relu - [dropout]} x (L - 1) - affine - softmax
+
+        for i in reversed(range(self.num_layers)):
+            fc_cache, relu_cache = self.cache['cache' + str(i + 1)]
+            if relu_cache is not None:
+                df = relu_backward(df, relu_cache)
+            df, dW, db = affine_backward(df, fc_cache)
+            W = fc_cache[1]
+            grads['W' + str(i + 1)] = dW + reg * W
+            grads['b' + str(i + 1)] = db
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
