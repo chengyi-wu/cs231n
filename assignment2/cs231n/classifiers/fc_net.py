@@ -353,6 +353,9 @@ class FullyConnectedNet(object):
                 if self.use_batchnorm:
                     layer_out, layer_cache = batchnorm_forward(layer_out, gamma, beta, self.bn_params[i])
                     cache['bn_cache'] = layer_cache
+                if self.use_dropout:
+                    layer_out, layer_cache = dropout_forward(layer_out, self.dropout_param)
+                    cache['dropout_cache'] = layer_cache
                 layer_out, layer_cache = relu_forward(layer_out)
                 cache['relu_cache'] = layer_cache
             elif i == self.num_layers - 1:
@@ -364,6 +367,9 @@ class FullyConnectedNet(object):
                 if self.use_batchnorm:
                     layer_out, layer_cache = batchnorm_forward(layer_out, gamma, beta, self.bn_params[i])
                     cache['bn_cache'] = layer_cache
+                if self.use_dropout:
+                    layer_out, layer_cache = dropout_forward(layer_out, self.dropout_param)
+                    cache['dropout_cache'] = layer_cache
                 layer_out, layer_cache = relu_forward(layer_out)
                 cache['relu_cache'] = layer_cache
             self.cache['cache' + idx] = cache
@@ -406,6 +412,8 @@ class FullyConnectedNet(object):
                     df, dgamma, dbeta = batchnorm_backward(df, cache['bn_cache'])
                     grads['gamma' + idx] = dgamma
                     grads['beta' + idx] = dbeta
+                if self.use_dropout:
+                    df = dropout_backward(df, cache['dropout_cache'])
             df, dW, db = affine_backward(df, cache['fc_cache'])
             W = cache['fc_cache'][1]
             grads['W' + idx] = dW + reg * W
