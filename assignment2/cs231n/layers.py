@@ -311,6 +311,8 @@ def batchnorm_backward(dout, cache):
     dbeta = np.sum(dout, axis=0)
 
     # refer to https://zhuanlan.zhihu.com/p/26138673 for details
+    # refer to this: https://kevinzakka.github.io/2016/09/14/batch_normalization/
+    # mu is a function of sigma, therefore it needs to add?
 
     doutdx_head = dout * gamma
     doutdvar = np.sum(doutdx_head * (x - sample_mean) * (-0.5) * ((sample_var + eps) ** - 1.5), axis=0)
