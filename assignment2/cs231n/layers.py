@@ -210,7 +210,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     # code from the paper
 
     sample_mean = np.mean(x,axis=0)
-    sample_var = np.mean((x - sample_mean) ** 2, axis=0)
+    # sample_var = np.mean((x - sample_mean) ** 2, axis=0)
+    sample_var = np.var(x, axis=0)
 
     # delta = x - sample_mean
     # sample_var = np.mean(delta ** 2, axis=0)
@@ -219,7 +220,6 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     # sigma = sample_var + eps
     # sigmasqrt = np.sqrt(sigma)
 
-    x_head = (x - sample_mean) / np.sqrt(sample_var + eps)
     # x_head = delta / sigmasqrt
 
     if mode == 'train':
@@ -245,6 +245,12 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         '''
         running_mean = momentum * running_mean + (1 - momentum) * sample_mean
         running_var = momentum * running_var + (1 - momentum) * sample_var
+
+        x_head = (x - sample_mean) / np.sqrt(sample_var + eps)
+
+        out = gamma * x_head + beta
+
+        cache = (x, x_head, gamma, beta, eps, sample_mean, sample_var)
         #######################################################################
         #                           END OF YOUR CODE                          #
         #######################################################################
@@ -256,22 +262,19 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # Store the result in the out variable.                               #
         #######################################################################
         # pass
-        running_mean = sample_mean
-        running_var = sample_var
+        
+        # from the paper
+        scale = gamma / np.sqrt(sample_var + eps)
+        out = x * scale + beta - sample_mean * scale
         #######################################################################
         #                          END OF YOUR CODE                           #
         #######################################################################
     else:
         raise ValueError('Invalid forward batchnorm mode "%s"' % mode)
  
-    out = gamma * x_head + beta
-
     # Store the updated running means back into bn_param
     bn_param['running_mean'] = running_mean
-    bn_param['running_var'] = running_var
-
-    #cache = (x, x_head, gamma, beta, eps, sample_mean, sample_var, delta, sigma, sigmasqrt)
-    cache = (x, x_head, gamma, beta, eps, sample_mean, sample_var)
+    bn_param['running_var'] = running_var   
 
     return out, cache
 

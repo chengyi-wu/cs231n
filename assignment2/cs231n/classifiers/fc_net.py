@@ -262,8 +262,17 @@ class FullyConnectedNet(object):
             
             b = np.zeros((1, col))
 
-            self.params['W' + str(i + 1)] = W
-            self.params['b' + str(i + 1)] = b 
+            idx = str(i + 1)
+
+            self.params['W' + idx] = W
+            self.params['b' + idx] = b 
+
+            if self.use_batchnorm and i != self.num_layers - 1:
+                gamma = np.ones((1, col))
+                beta = b.copy()
+
+                self.params['gamma' + idx] = gamma
+                self.params['beta' + idx] = beta
         # for name in sorted(self.params):
         #     print(name, self.params[name].shape)
         ############################################################################
@@ -329,21 +338,37 @@ class FullyConnectedNet(object):
         reg_loss = 0
         self.cache = {}
         for i in range(self.num_layers):
-            W = self.params['W' + str(i + 1)]
-            b = self.params['b' + str(i + 1)]
+            idx = str(i + 1)
+            W = self.params['W' + idx]
+            b = self.params['b' + idx]
+            if self.use_batchnorm and i != self.num_layers - 1:
+                gamma = self.params['gamma' + idx]
+                beta = self.params['beta' + idx]
             reg_loss += 0.5 * reg * np.sum(W * W)
+            
+            cache = {}
             if i == 0:
-                fc_out, fc_cache = affine_forward(X, W, b)
-                relu_out, relu_cache = relu_forward(fc_out)
+                layer_out, layer_cache = affine_forward(X, W, b)
+                cache['fc_cache'] = layer_cache
+                if self.use_batchnorm:
+                    layer_out, layer_cache = batchnorm_forward(layer_out, gamma, beta, self.bn_params[i])
+                    cache['bn_cache'] = layer_cache
+                layer_out, layer_cache = relu_forward(layer_out)
+                cache['relu_cache'] = layer_cache
             elif i == self.num_layers - 1:
-                fc_out, fc_cache = affine_forward(relu_out, W, b)
-                relu_out, relu_cache = None, None
+                layer_out, layer_cache = affine_forward(layer_out, W, b)
+                cache['fc_cache'] = layer_cache
             else:
-                fc_out, fc_cache = affine_forward(relu_out, W, b)
-                relu_out, relu_cache = relu_forward(fc_out)
-            self.cache['cache' + str(i + 1)] = (fc_cache, relu_cache)
+                layer_out, layer_cache = affine_forward(layer_out, W, b)
+                cache['fc_cache'] = layer_cache
+                if self.use_batchnorm:
+                    layer_out, layer_cache = batchnorm_forward(layer_out, gamma, beta, self.bn_params[i])
+                    cache['bn_cache'] = layer_cache
+                layer_out, layer_cache = relu_forward(layer_out)
+                cache['relu_cache'] = layer_cache
+            self.cache['cache' + idx] = cache
 
-        scores = fc_out
+        scores = layer_out
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -373,13 +398,18 @@ class FullyConnectedNet(object):
         # {affine - [batch norm] - relu - [dropout]} x (L - 1) - affine - softmax
 
         for i in reversed(range(self.num_layers)):
-            fc_cache, relu_cache = self.cache['cache' + str(i + 1)]
-            if relu_cache is not None:
-                df = relu_backward(df, relu_cache)
-            df, dW, db = affine_backward(df, fc_cache)
-            W = fc_cache[1]
-            grads['W' + str(i + 1)] = dW + reg * W
-            grads['b' + str(i + 1)] = db
+            idx = str(i + 1)
+            cache = self.cache['cache' + idx]
+            if i != self.num_layers - 1:
+                df = relu_backward(df, cache['relu_cache'])
+                if self.use_batchnorm:
+                    df, dgamma, dbeta = batchnorm_backward(df, cache['bn_cache'])
+                    grads['gamma' + idx] = dgamma
+                    grads['beta' + idx] = dbeta
+            df, dW, db = affine_backward(df, cache['fc_cache'])
+            W = cache['fc_cache'][1]
+            grads['W' + idx] = dW + reg * W
+            grads['b' + idx] = db     
 
         ############################################################################
         #                             END OF YOUR CODE                             #
