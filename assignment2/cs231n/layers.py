@@ -316,7 +316,7 @@ def batchnorm_backward(dout, cache):
 
     doutdx_head = dout * gamma
     doutdvar = np.sum(doutdx_head * (x - sample_mean) * (-0.5) * ((sample_var + eps) ** - 1.5), axis=0)
-    doutdmean = np.sum(- doutdx_head / np.sqrt(sample_var + eps), axis=0) + doutdvar * np.sum(-2 * (x - sample_mean), axis=0) / N
+    doutdmean = np.sum(- doutdx_head / np.sqrt(sample_var + eps), axis=0) # + doutdvar * np.sum(-2 * (x - sample_mean), axis=0) / N
     
     dx = doutdx_head / np.sqrt(sample_var + eps) + doutdvar * 2 * (x - sample_mean) / N + doutdmean / N
 
@@ -363,7 +363,7 @@ def batchnorm_backward_alt(dout, cache):
     sigmasqrt = np.sqrt(sigma)
 
     doutdvar = np.sum(doutdx_head * delta * (-0.5) * (sigma ** - 1.5), axis=0)
-    doutdmean = np.sum(- doutdx_head / sigmasqrt, axis=0) + doutdvar * np.sum(-2 * delta, axis=0) / N
+    doutdmean = np.sum(- doutdx_head / sigmasqrt, axis=0) # + doutdvar * np.sum(-2 * delta, axis=0) / N
     
     dx = doutdx_head / sigmasqrt + doutdvar * 2 * delta / N + doutdmean / N
     ###########################################################################
@@ -485,7 +485,27 @@ def conv_forward_naive(x, w, b, conv_param):
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
-    pass
+    # pass
+    
+    N, C, H, W = x.shape
+    F, _, HH, WW = w.shape
+    S = conv_param['stride']
+    P = conv_param['pad']
+
+    # declare the output
+    out = np.zeros((N, F, (H - HH + 2 * P) / S + 1, (W - WW + 2 * P) / S + 1))
+    #print(out.shape)
+
+    pad_width = ((0,0), (0,0), (P, P),(P, P))
+
+    X = np.pad(x, pad_width=pad_width, mode='constant', constant_values=0)
+    #print(x.shape, X.shape)
+
+    for i in range(N):
+        for f in range(F): # filters
+            for h in range((H - HH + 2 * P) / S + 1): # row
+                for j in range((W - WW + 2 * P) / S + 1): #col
+                    out[i, f, h, j] += np.sum(X[i, :, h * S : h * S + HH, j * S : j * S + WW] * w[f]) + b[f]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -510,7 +530,21 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
-    pass
+    # pass
+    x, w, b, conv_param = cache
+
+    N, C, H, W = x.shape
+    F, _, HH, WW = w.shape
+
+    print(dout.shape)
+    print(x.shape, w.shape)
+    
+    db = np.sum(dout.copy(),axis=0)
+
+    # dx should has the same shape as x (N, C, H, W)
+    dx = np.zeros_like(x)
+
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
