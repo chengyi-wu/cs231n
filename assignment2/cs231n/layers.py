@@ -551,39 +551,40 @@ def conv_backward_naive(dout, cache):
 
     pad_width = ((0,0), (0,0), (P, P), (P, P))
 
-    # df =  (N, F, H' + 2 * pad, W' + 2 * pad) 
     x = np.pad(x.copy(), pad_width=pad_width, mode='constant', constant_values=0)
 
-    H_Prime = (H - HH + 2 * P) / S + 1
-    W_Prime = (W - WW + 2 * P) / S + 1
+    _, _, H_Prime, W_Prime = dout.shape
 
     for i in range(N):
         for f in range(F):
-            for c in range(C):
-                # dw is a sum for all i
-                # (H', W') and (H, W)
-                # HH = H - (H' - 1) * stride + 2 * pad
-                # this should be the sum of all input's channel
-                for hh in range(HH):
-                    for ww in range(WW):
-                        dw[f, c, hh, ww] += np.sum(dout[i, f, :, :] * x[i, c, hh * S : hh * S + H_Prime, ww * S : ww * S + W_Prime])
-    
-    #df = np.pad(dout.copy(), pad_width=pad_width, mode='constant', constant_values=1) 
-    #df = dout.copy()
+            for h in range(H_Prime):
+                for j in range(W_Prime):
+                    # consider it backward:
+                    # X (3, 3) * W (3, 3) -> Y(1, 1)
+                    # Y(1, 1) * X(3, 3) = W(3,3)
+                    dw[f, :] += dout[i, f, h, j] * x[i, :, h * S : h * S + HH, j * S : j * S + WW]
+
     dx = np.zeros_like(x)
 
+    # for i in range(N):
+    #     for c in range(C):
+    #         for f in range(F):
+    #             for h in range(H_Prime): # row
+    #                 for j in range(W_Prime): #col
+    #                     # this should be the sum of the filters in each channel
+    #                     '''
+    #                     (3, 3) * (3, 3) => (1, 1)
+    #                     The reverse should be (1, 1) * (3,3) = (3, 3)
+    #                     Keep the dimension of the weights
+    #                     '''
+    #                     dx[i, c, h * S : h * S + HH, j * S : j * S + WW] += dout[i, f, h, j] * w[f, c, :, :]
+
+    # turns out channel is optional
     for i in range(N):
-        for c in range(C):
-            for f in range(F):
-                for h in range(H_Prime): # row
-                    for j in range(W_Prime): #col
-                        # this should be the sum of the filters in each channel
-                        '''
-                        (3, 3) * (3, 3) => (1, 1)
-                        The reverse should be (1, 1) * (3,3) = (3, 3)
-                        Keep the dimension of the weights
-                        '''
-                        dx[i, c, h * S : h * S + HH, j * S : j * S + WW] += dout[i, f, h, j] * w[f, c, :, :]
+        for f in range(F):
+            for h in range(H_Prime): # row
+                for j in range(W_Prime): #col
+                    dx[i, :, h * S : h * S + HH, j * S : j * S + WW] += dout[i, f, h, j] * w[f]                    
     # Remove the zero padding
     dx = dx[:, :, P:-P, P:-P]
     ###########################################################################
@@ -628,8 +629,9 @@ def max_pool_forward_naive(x, pool_param):
                 for w in range(W // S):
                     # pool is a (pool_height, pool_width matrix) matrix
                     pool = x[i, c, h * S : h * S + pool_height, w * S: w * S + pool_width]
-                    out[i, c, h, w] = np.max(pool)
-                    switch[i, c, h, w] = int(np.argmax(pool))
+                    idx = np.argmax(pool)
+                    switch[i, c, h, w] = idx
+                    out[i, c, h, w] = pool.flatten()[idx]
 
     #print(switch)
     ###########################################################################
