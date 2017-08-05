@@ -535,16 +535,57 @@ def conv_backward_naive(dout, cache):
 
     N, C, H, W = x.shape
     F, _, HH, WW = w.shape
+    S = conv_param['stride']
+    P = conv_param['pad']
 
-    print(dout.shape)
-    print(x.shape, w.shape)
-    
-    db = np.sum(dout.copy(),axis=0)
+    db = np.zeros_like(b)
 
+    for i in range(N):
+        for f in range(F):
+            db[f] += np.sum(dout[i, f, :, :])
+
+    # dw is the smae shape as w (F, C, HH, WW)
+    dw = np.zeros_like(w)
     # dx should has the same shape as x (N, C, H, W)
     dx = np.zeros_like(x)
 
+    pad_width = ((0,0), (0,0), (P, P), (P, P))
+
+    # df =  (N, F, H' + 2 * pad, W' + 2 * pad) 
+    x = np.pad(x.copy(), pad_width=pad_width, mode='constant', constant_values=0)
+
+    H_Prime = (H - HH + 2 * P) / S + 1
+    W_Prime = (W - WW + 2 * P) / S + 1
+
+    for i in range(N):
+        for f in range(F):
+            for c in range(C):
+                # dw is a sum for all i
+                # (H', W') and (H, W)
+                # HH = H - (H' - 1) * stride + 2 * pad
+                # this should be the sum of all input's channel
+                for hh in range(HH):
+                    for ww in range(WW):
+                        dw[f, c, hh, ww] += np.sum(dout[i, f, :, :] * x[i, c, hh * S : hh * S + H_Prime, ww * S : ww * S + W_Prime])
     
+    #df = np.pad(dout.copy(), pad_width=pad_width, mode='constant', constant_values=1) 
+    #df = dout.copy()
+    dx = np.zeros_like(x)
+
+    for i in range(N):
+        for c in range(C):
+            for f in range(F):
+                for h in range(H_Prime): # row
+                    for j in range(W_Prime): #col
+                        # this should be the sum of the filters in each channel
+                        '''
+                        (3, 3) * (3, 3) => (1, 1)
+                        The reverse should be (1, 1) * (3,3) = (3, 3)
+                        Keep the dimension of the weights
+                        '''
+                        dx[i, c, h * S : h * S + HH, j * S : j * S + WW] += dout[i, f, h, j] * w[f, c, :, :]
+    # Remove the zero padding
+    dx = dx[:, :, P:-P, P:-P]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -570,11 +611,31 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # TODO: Implement the max pooling forward pass                            #
     ###########################################################################
-    pass
+    # pass
+    
+    N, C, H, W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    S = pool_param['stride']
+
+    out = np.zeros((N, C, H // S, W // S))
+
+    switch = np.zeros_like(out, dtype=int)
+
+    for i in range(N):
+        for c in range(C):
+            for h in range(H // S):
+                for w in range(W // S):
+                    # pool is a (pool_height, pool_width matrix) matrix
+                    pool = x[i, c, h * S : h * S + pool_height, w * S: w * S + pool_width]
+                    out[i, c, h, w] = np.max(pool)
+                    switch[i, c, h, w] = int(np.argmax(pool))
+
+    #print(switch)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    cache = (x, pool_param)
+    cache = (x, pool_param, switch)
     return out, cache
 
 
@@ -593,7 +654,25 @@ def max_pool_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the max pooling backward pass                           #
     ###########################################################################
-    pass
+    # pass
+    x, pool_param, switch = cache
+    
+    N, C, H, W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    S = pool_param['stride']
+
+    dx = np.zeros_like(x)
+
+    for i in range(N):
+        for c in range(C):
+            for h in range(H // S):
+                for w in range(W // S):
+                    pool = dx[i, c, h * S : h * S + pool_height, w * S: w * S + pool_width]
+                    pool = pool.flatten()
+                    idx = switch[i, c, h, w]
+                    pool[idx] = dout[i, c, h, w]
+                    dx[i, c, h * S : h * S + pool_height, w * S: w * S + pool_width] = pool.reshape((pool_height, pool_width))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
