@@ -48,7 +48,44 @@ class ThreeLayerConvNet(object):
         # hidden affine layer, and keys 'W3' and 'b3' for the weights and biases   #
         # of the output affine layer.                                              #
         ############################################################################
-        pass
+        # pass
+
+        # CONV's weights: F, C, H, W
+        # W = F, C, Filter_Size, Filter_Size
+        # OUTPUT = N, F, HH, WW
+        shape = (num_filters, input_dim[0], filter_size, filter_size)
+        size = num_filters * input_dim[0] * filter_size * filter_size
+        W1 = np.random.normal(loc=0.0, scale=weight_scale, 
+            size=size).reshape(shape)
+        b1 = np.zeros(num_filters)
+
+        # OUTPUT = N, F, H / 2, W / 2 after pooling
+
+        # CONV -> FC
+        # F = 1, one filter
+        # C = the same as the output of CONV layer, num_filters
+        # HH, WW = 16, 16 (filter size)
+        shape = (num_filters * (input_dim[1] / 2) * (input_dim[2] / 2), hidden_dim)
+        size = num_filters * (input_dim[1] / 2) * (input_dim[2] / 2) * hidden_dim
+        W2 = np.random.normal(loc=0.0, scale=weight_scale,
+            size=size).reshape(shape)
+
+        b2 = np.zeros(hidden_dim)
+
+        # FC -> FC
+        # input_dim = 100
+        # output_dim = 10
+        W3 = np.random.normal(loc=0.0, scale=weight_scale, 
+            size=hidden_dim * num_classes).reshape(hidden_dim, num_classes)
+
+        b3 = np.zeros(num_classes)
+
+        self.params['W1'] = W1
+        self.params['W2'] = W2
+        self.params['W3'] = W3
+        self.params['b1'] = b1
+        self.params['b2'] = b2
+        self.params['b3'] = b3
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -80,7 +117,27 @@ class ThreeLayerConvNet(object):
         # computing the class scores for X and storing them in the scores          #
         # variable.                                                                #
         ############################################################################
-        pass
+        # pass
+
+        # CONV layer
+        #conv_out, conv_cache = conv_forward_naive(X, W1, b1, conv_param)
+        conv_out, conv_cache = conv_forward_fast(X, W1, b1, conv_param)
+        relu_out, relu_cache = relu_forward(conv_out)
+        #pool_out, pool_cache = max_pool_forward_naive(relu_out, pool_param)
+        pool_out, pool_cache = max_pool_forward_fast(relu_out, pool_param)
+
+        conv_layer_cache = (conv_cache, relu_cache, pool_cache)
+
+        # FC layer
+        fc_out, fc_cache = affine_forward(pool_out, W2, b2)
+        relu_out, relu_cache = relu_forward(fc_out)
+
+        fc_layer_cache = (fc_cache, relu_cache)
+
+        # OUTPUT layer
+        fc_out, fc_cache = affine_forward(relu_out, W3, b3)
+
+        scores = fc_out
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -95,7 +152,34 @@ class ThreeLayerConvNet(object):
         # data loss using softmax, and make sure that grads[k] holds the gradients #
         # for self.params[k]. Don't forget to add L2 regularization!               #
         ############################################################################
-        pass
+        # pass
+        reg_loss = 0.5 * self.reg * (np.sum(W1 * W1) + np.sum(W2 * W2) + np.sum(W3 * W3))
+        data_loss, dldy = softmax_loss(scores, y)
+
+        loss = data_loss + reg_loss
+
+        dldy, dW3, db3 = affine_backward(dldy, fc_cache)
+
+        grads['W3'] = dW3 + self.reg * W3
+        grads['b3'] = db3 
+
+        dldy = relu_backward(dldy, fc_layer_cache[1])
+        dldy, dW2, db2 = affine_backward(dldy, fc_layer_cache[0])
+
+        grads['W2'] = dW2 + self.reg * W2
+        grads['b2'] = db2
+
+        # dldy = max_pool_backward_naive(dldy, conv_layer_cache[2])
+        dldy = max_pool_backward_fast(dldy, conv_layer_cache[2])
+        dldy = relu_backward(dldy, conv_layer_cache[1])
+        # dldy, dW1, db1 = conv_backward_naive(dldy, conv_layer_cache[0])
+        dldy, dW1, db1 = conv_backward_fast(dldy, conv_layer_cache[0])
+
+        # fast only improves the performance, native implementaiton is correctly
+        # for gradient check
+
+        grads['W1'] = dW1 + self.reg * W1
+        grads['b1'] = db1
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
