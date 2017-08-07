@@ -493,7 +493,9 @@ def conv_forward_naive(x, w, b, conv_param):
     P = conv_param['pad']
 
     # declare the output
-    out = np.zeros((N, F, (H - HH + 2 * P) / S + 1, (W - WW + 2 * P) / S + 1))
+    H_Prime = (H - HH + 2 * P) // S + 1
+    W_Prime = (W - WW + 2 * P) // S + 1
+    out = np.zeros((N, F, H_Prime, W_Prime))
     #print(out.shape)
 
     pad_width = ((0,0), (0,0), (P, P),(P, P))
@@ -503,8 +505,8 @@ def conv_forward_naive(x, w, b, conv_param):
 
     for i in range(N):
         for f in range(F): # filters
-            for h in range((H - HH + 2 * P) / S + 1): # row
-                for j in range((W - WW + 2 * P) / S + 1): #col
+            for h in range(H_Prime): # row
+                for j in range(W_Prime): #col
                     out[i, f, h, j] += np.sum(X[i, :, h * S : h * S + HH, j * S : j * S + WW] * w[f]) + b[f]
     ###########################################################################
     #                             END OF YOUR CODE                            #

@@ -65,8 +65,8 @@ class ThreeLayerConvNet(object):
         # F = 1, one filter
         # C = the same as the output of CONV layer, num_filters
         # HH, WW = 16, 16 (filter size)
-        shape = (num_filters * (input_dim[1] / 2) * (input_dim[2] / 2), hidden_dim)
-        size = num_filters * (input_dim[1] / 2) * (input_dim[2] / 2) * hidden_dim
+        shape = (num_filters * (input_dim[1] // 2) * (input_dim[2] // 2), hidden_dim)
+        size = num_filters * (input_dim[1] // 2) * (input_dim[2] // 2) * hidden_dim
         W2 = np.random.normal(loc=0.0, scale=weight_scale,
             size=size).reshape(shape)
 
