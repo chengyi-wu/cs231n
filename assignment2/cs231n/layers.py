@@ -760,8 +760,8 @@ def spatial_batchnorm_backward(dout, cache):
     for c in range(C):
         df, gamma, beta \
             = batchnorm_backward(dout[:, c].reshape(-1, H * W), cache[c])
-        dgamma[c] = np.sum(gamma)
-        dbeta[c] = np.sum(beta)
+        dgamma[c] = np.sum(gamma, axis=0)
+        dbeta[c] = np.sum(beta, axis=0)
         dx[:, c] = df.reshape(-1, H, W)
     ###########################################################################
     #                             END OF YOUR CODE                            #
