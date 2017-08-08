@@ -338,20 +338,28 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
 
     x, prev_h, prev_c, Wx, Wh, b, i, f, o, g, next_c, next_h = cache
 
-    dldai = dnext_c * g * (i * (1 - i))
-    dldaf = dnext_c * prev_c * (f * (1 - f))
-    dldag = dnext_c * i * (1 - g * g)
+    dldc = dnext_h * o * (1 - np.tanh(next_c) ** 2)
+
+    '''
+    Need to understand this line
+    It looks like the derivative to c(t) is dldh(t) * dh(t)dc(t) + dldc
+    '''
+    dldc += dnext_c
+
+    dldai = dldc * g * (i * (1 - i))
+    dldaf = dldc * prev_c * (f * (1 - f))
+    dldag = dldc * i * (1 - g * g)
     dldao = dnext_h * np.tanh(next_c) * (o * (1 - o))
 
-    dlda = np.hstack((np.hstack((np.hstack((dldai, dldaf)), dldao)), dldag))
+    dlda = np.concatenate((dldai, dldaf, dldao, dldag), axis=1)
 
     db = np.sum(dlda, axis=0)
     
-    dprev_c = dnext_c * f
-    dprev_h = 0
-    dWx = 0
-    dWh = 0
-    dx = 0
+    dprev_c = dldc * f
+    dprev_h = dlda.dot(Wh.T)
+    dWx = x.T.dot(dlda)
+    dWh = prev_h.T.dot(dlda)
+    dx = dlda.dot(Wx.T)
 
     ##############################################################################
     #                               END OF YOUR CODE                             #
