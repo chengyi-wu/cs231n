@@ -214,7 +214,22 @@ class CaptioningRNN(object):
         # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
         # a loop.                                                                 #
         ###########################################################################
-        pass
+        # pass
+        '''
+        The initial hidden state is computed by applying an affine
+        transform to the input image features, and the initial word is the <START>
+        token.
+        '''
+        h0, _ = affine_forward(features, W_proj, b_proj)
+        x, _ = word_embedding_forward(captions, W_embed)
+        N, T, D = x.shape
+        prev_h = h0
+        captions[:, 0] += self._start
+        for t in range(T - 1):
+          prev_h, _ = rnn_step_forward(x[:, t], prev_h, Wx, Wh, b)
+          scores, _ = affine_forward(prev_h, W_vocab, b_vocab)
+          captions[:, t + 1] += np.argmax(scores, axis=1)
+          #print(np.argmax(scores, axis=1))
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
