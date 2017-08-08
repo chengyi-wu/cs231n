@@ -399,16 +399,20 @@ def lstm_forward(x, h0, Wx, Wh, b):
     #############################################################################
     # pass
     N, T, D = x.shape
-    h = np.zeros((N, T, h0.shape[1]))
-    c = np.zeros_like(h)
+    H = h0.shape[1]
+    h = np.zeros((N, T, H))
+    c = np.zeros((N, H))
     step_cache = {}
     for t in range(T):
         if t == 0:
             prev_h = h0
         else:
             prev_h = h[:, t - 1]
-        h[:, t], c[:, t], step_cache[t] = lstm_step_forward(x[:, t], prev_h, c[:, t - 1], Wx, Wh, b)
-    cache = (x, h0.shape[1], step_cache)
+        # fix the bug here that's going to change the cell[0]'s state if 
+        # c is (N, T, H) c needs to be (N, T + 1, H). Adding one more 
+        # state for init.
+        h[:, t], c, step_cache[t] = lstm_step_forward(x[:, t], prev_h, c, Wx, Wh, b)
+    cache = (N, T, D, H, step_cache)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -418,7 +422,7 @@ def lstm_forward(x, h0, Wx, Wh, b):
 
 def lstm_backward(dh, cache):
     """
-    Backward pass for an LSTM over an entire sequence of data.]
+    Backward pass for an LSTM over an entire sequence of data.
 
     Inputs:
     - dh: Upstream gradients of hidden states, of shape (N, T, H)
@@ -437,20 +441,19 @@ def lstm_backward(dh, cache):
     # You should use the lstm_step_backward function that you just defined.     #
     #############################################################################
     # pass
-    x, H, step_cache = cache
-    N, T, D = x.shape
-    dnext_h = np.zeros((N, H))
-    dnext_c = np.zeros((N, H))
-    dx = np.zeros_like(x)
+    N, T, D, H, step_cache = cache
+    dprev_h = np.zeros((N, H))
+    dprev_c = np.zeros((N, H))
+    dx = np.zeros((N, T, D))
     dWh = np.zeros((H, 4 * H))
     dWx = np.zeros((D, 4 * H))
     db = np.zeros((4 * H))
     for t in reversed(range(T)):
-        dx[:, t], dnext_h, dnext_c, _dWx, _dWh, _db = lstm_step_backward(dh[:, t] + dnext_h, dnext_c, step_cache[t])
+        dx[:, t], dprev_h, dprev_c, _dWx, _dWh, _db = lstm_step_backward(dh[:, t] + dprev_h, dprev_c, step_cache[t])
         dWh += _dWh
         dWx += _dWx
         db += _db
-    dh0 = dnext_h
+    dh0 = dprev_h
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
