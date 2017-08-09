@@ -226,20 +226,31 @@ class CaptioningRNN(object):
         token.
         '''
         h0, _ = affine_forward(features, W_proj, b_proj)
-        x, _ = word_embedding_forward(captions, W_embed)
-        N, T, D = x.shape
+        N, D = features.shape
         prev_h = h0
         prev_c = np.zeros((N, h0.shape[1]))
-        captions[:, 0] += self._start
-        for t in range(T - 1):
+
+        '''
+        CHENGYI: This is what it means by embeding the first word <start>.
+        The dtype needs to be int32 for indexing
+
+        T is always = 1
+        '''
+        x = self._start * np.ones((N, 1), dtype=np.int32)
+
+        for t in range(max_length):
+          x, _ = word_embedding_forward(x, W_embed)
+          x = np.squeeze(x, axis=1)
           if self.cell_type == 'rnn':
-            prev_h, _ = rnn_step_forward(x[:, t], prev_h, Wx, Wh, b)
+            prev_h, _ = rnn_step_forward(x, prev_h, Wx, Wh, b)
           elif self.cell_type == 'lstm':
-            prev_h, prev_c, _ = lstm_step_forward(x[:, t], prev_h, prev_c, Wx, Wh, b)
+            prev_h, prev_c, _ = lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b)
           else:
             raise Exception(('cell_type = %s not supported') % self.cell_type)
           scores, _ = affine_forward(prev_h, W_vocab, b_vocab)
-          captions[:, t + 1] += np.argmax(scores, axis=1)
+          x = np.argmax(scores, axis=1)
+          captions[:, t] = x
+          x = x.reshape((-1, 1))
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################

@@ -195,12 +195,11 @@ def word_embedding_forward(x, W):
 
     # TODO: this is naive implementation, need to re-write for np's array indexing
 
-    temp = np.zeros((N, T, V))
+    out = np.zeros((N, T, D))
     for i in range(N):
         for t in range(T):
-            temp[i, t, x[i, t]] = 1
-    out = np.dot(temp, W)
-    cache = (x, W, temp)
+            out[i, t, :] = W[x[i, t], :]
+    cache = (x, W)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -230,7 +229,7 @@ def word_embedding_backward(dout, cache):
     # HINT: Look up the function np.add.at                                       #
     ##############################################################################
     # pass
-    x, W, temp = cache
+    x, W = cache
     dW = np.zeros_like(W)
 
     N, T = x.shape
@@ -240,7 +239,7 @@ def word_embedding_backward(dout, cache):
 
     for i in range(N):
         for t in range(T):
-            dW += np.dot(temp[i, t].reshape(V, 1), dout[i, t].reshape(1, D))
+            np.add.at(dW, x[i, t], dout[i, t, :])
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
