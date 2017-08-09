@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 
 from data_utils import load_CIFAR10
 
+import platform
+
 def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=10000):
     """
     Load the CIFAR-10 dataset from disk and perform preprocessing to prepare
@@ -13,7 +15,12 @@ def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=10000):
     we used for the SVM, but condensed to a single function.  
     """
     # Load the raw CIFAR-10 data
-    cifar10_dir = '.\\cifar-10'
+    if platform == "Darwin":
+        cifar10_dir = './cifar-10/cifar-10-batches-py'
+    elif platform == 'Windows':
+        cifar10_dir = '.\\cifar-10'
+    else:
+        cifar10_dir = '/cifar-10'
     X_train, y_train, X_test, y_test = load_CIFAR10(cifar10_dir)
 
     # Subsample the data
@@ -113,11 +120,13 @@ def main():
     y_out = complex_model(X,y,is_training=is_training)
 
     # define our loss
-    total_loss = tf.losses.hinge_loss(tf.one_hot(y,10),logits=y_out)
+    # total_loss = tf.losses.hinge_loss(tf.one_hot(y,10),logits=y_out)
+    total_loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), logits=y_out)
     mean_loss = tf.reduce_mean(total_loss)
 
     # define our optimizer
-    optimizer = tf.train.AdamOptimizer(5e-4) # select optimizer and set learning rate
+    # optimizer = tf.train.AdamOptimizer(5e-4) # select optimizer and set learning rate
+    optimizer = tf.train.RMSPropOptimizer(1e-3)
     train_step = optimizer.minimize(mean_loss)
 
     def run_model(session, predict, loss_val, Xd, yd,
