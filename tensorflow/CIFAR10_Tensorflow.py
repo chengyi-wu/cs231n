@@ -15,9 +15,10 @@ def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=10000):
     we used for the SVM, but condensed to a single function.  
     """
     # Load the raw CIFAR-10 data
-    if platform == "Darwin":
+    system = platform.system()
+    if system == "Darwin":
         cifar10_dir = './cifar-10/cifar-10-batches-py'
-    elif platform == 'Windows':
+    elif system == 'Windows':
         cifar10_dir = '.\\cifar-10'
     else:
         cifar10_dir = '/cifar-10'
@@ -72,12 +73,12 @@ def complex_model(X,y,is_training):
         
     # setup variables
     # 7x7x3 with 32 filters
-    Wconv1 = tf.get_variable("Wconv1", shape=[7, 7, 3, 32])
+    Wconv1 = tf.get_variable("Wconv1", shape=[5, 5, 3, 32])
     bconv1 = tf.get_variable("bconv1", shape=[32])
 
-    # 32x32x3 -> conv -> 13x13x32 -> max_pool (2,2), strides = 2 -> 6 * 6 * 32 = 1152
+    # 32x32x3 -> conv -> 14x14x32 -> max_pool (2,2), strides = 2 -> 7 * 7 * 32 = 1152
 
-    W1 = tf.get_variable("W1", shape=[1152 , 1024])
+    W1 = tf.get_variable("W1", shape=[1568 , 1024])
     b1 = tf.get_variable("b1", shape=[1024])
 
     W2 = tf.get_variable("W2", shape=[1024 , 10])
@@ -90,7 +91,7 @@ def complex_model(X,y,is_training):
     h1 = tf.contrib.layers.batch_norm(h1, center=True, scale=True, is_training=is_training)
     h1 = tf.nn.max_pool(h1, ksize=[1,2,2,1], strides=[1,2,2,1], padding='VALID')
 
-    h1_flat = tf.reshape(h1,[-1,1152])
+    h1_flat = tf.reshape(h1,[-1,1568])
     a2 = tf.matmul(h1_flat,W1) + b1
     h2 = tf.nn.relu(a2)
 
@@ -194,7 +195,7 @@ def main():
         return total_loss,total_correct
 
     with tf.Session() as sess:
-        with tf.device("/cpu:0"): #"/cpu:0" or "/gpu:0" 
+        with tf.device("/gpu:0"): #"/cpu:0" or "/gpu:0" 
             sess.run(tf.global_variables_initializer())
             print('Training')
             run_model(sess,y_out,mean_loss,X_train,y_train,1,64,100,train_step,True)
