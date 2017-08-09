@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import math
 import timeit
+import matplotlib.pyplot as plt
+
 from data_utils import load_CIFAR10
 
 def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=10000):
@@ -33,7 +35,23 @@ def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=10000):
 
     return X_train, y_train, X_val, y_val, X_test, y_test
 
-def complex_model(X, y, is_training=True):
+def simple_model(X,y):
+    # define our weights (e.g. init_two_layer_convnet)
+        
+    # setup variables
+    Wconv1 = tf.get_variable("Wconv1", shape=[7, 7, 3, 32])
+    bconv1 = tf.get_variable("bconv1", shape=[32])
+    W1 = tf.get_variable("W1", shape=[5408, 10])
+    b1 = tf.get_variable("b1", shape=[10])
+
+    # define our graph (e.g. two_layer_convnet)
+    a1 = tf.nn.conv2d(X, Wconv1, strides=[1,2,2,1], padding='VALID') + bconv1
+    h1 = tf.nn.relu(a1)
+    h1_flat = tf.reshape(h1,[-1,5408])
+    y_out = tf.matmul(h1_flat,W1) + b1
+    return y_out
+
+def complex_model(X,y,is_training):
     '''
     7x7 Convolutional Layer with 32 filters and stride of 1
     ReLU Activation Layer
@@ -44,33 +62,33 @@ def complex_model(X, y, is_training=True):
     Affine layer from 1024 input units to 10 outputs
     '''
     # define our weights (e.g. init_two_layer_convnet)
-    
+        
     # setup variables
-    W1 = tf.get_variable("W1", shape=[7, 7, 3, 32])
-    b1 = tf.get_variable("b1", shape=[32])
-    W2 = tf.get_variable("W2", shape=[1152, 1024])
-    b2 = tf.get_variable("b2", shape=[1024])
-    W3 = tf.get_variable("W3", shape=[1024, 10])
-    b3 = tf.get_variable("b3", shape=[10])
+    # 7x7x3 with 32 filters
+    Wconv1 = tf.get_variable("Wconv1", shape=[7, 7, 3, 32])
+    bconv1 = tf.get_variable("bconv1", shape=[32])
+
+    # 32x32x3 -> conv -> 13x13x32 -> max_pool (2,2), strides = 2 -> 6 * 6 * 32 = 1152
+
+    W1 = tf.get_variable("W1", shape=[1152 , 1024])
+    b1 = tf.get_variable("b1", shape=[1024])
+
+    W2 = tf.get_variable("W2", shape=[1024 , 10])
+    b2 = tf.get_variable("b2", shape=[10])
 
     # define our graph (e.g. two_layer_convnet)
-    a1 = tf.nn.conv2d(X, W1, strides=[1,2,2,1], padding='VALID') + b1
+    a1 = tf.nn.conv2d(X, Wconv1, strides=[1,2,2,1], padding='VALID') + bconv1
     h1 = tf.nn.relu(a1)
-    print("after running ReLu")
-    print(h1.shape)
-    #h1 = tf.nn.batch_normalization(h1)
-    h1 = tf.nn.max_pool(h1, ksize=[1, 2, 2, 1], strides=[1,2,2,1], padding='VALID')
-    print("after running maxpooling")
-    print(h1.shape)
-    h1_flat = tf.reshape(h1,[-1,1152])
-    print("after reshape")
     
-    a2 = tf.matmul(h1_flat,W2) + b2
+    h1 = tf.contrib.layers.batch_norm(h1, center=True, scale=True, is_training=is_training)
+    h1 = tf.nn.max_pool(h1, ksize=[1,2,2,1], strides=[1,2,2,1], padding='VALID')
+
+    h1_flat = tf.reshape(h1,[-1,1152])
+    a2 = tf.matmul(h1_flat,W1) + b1
     h2 = tf.nn.relu(a2)
 
-    y_out = tf.matmul(h2, W3) + b3
+    y_out = tf.matmul(h2, W2) + b2
     return y_out
-    
 
 def main():
     # Invoke the above function to get our data.
@@ -82,11 +100,17 @@ def main():
     print('Test data shape: ', X_test.shape)
     print('Test labels shape: ', y_test.shape)
 
+    # clear old variables
+    tf.reset_default_graph()
+
+    # setup input (e.g. the data that changes every batch)
+    # The first dim is None, and gets sets automatically based on batch size fed in
     X = tf.placeholder(tf.float32, [None, 32, 32, 3])
     y = tf.placeholder(tf.int64, [None])
     is_training = tf.placeholder(tf.bool)
 
-    y_out = complex_model(X,y,is_training)
+    # y_out = simple_model(X,y)
+    y_out = complex_model(X,y,is_training=is_training)
 
     # define our loss
     total_loss = tf.losses.hinge_loss(tf.one_hot(y,10),logits=y_out)
@@ -99,7 +123,6 @@ def main():
     def run_model(session, predict, loss_val, Xd, yd,
               epochs=1, batch_size=64, print_every=100,
               training=None, plot_losses=False):
-        tf.reset_default_graph()
         # have tensorflow compute accuracy
         correct_prediction = tf.equal(tf.argmax(predict,1), y)
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -152,6 +175,13 @@ def main():
             total_loss = np.sum(losses)/Xd.shape[0]
             print("Epoch {2}, Overall loss = {0:.3g} and accuracy of {1:.3g}"\
                 .format(total_loss,total_correct,e+1))
+            if plot_losses:
+                plt.plot(losses)
+                plt.grid(True)
+                plt.title('Epoch {} Loss'.format(e+1))
+                plt.xlabel('minibatch number')
+                plt.ylabel('minibatch loss')
+                plt.show()
         return total_loss,total_correct
 
     with tf.Session() as sess:
