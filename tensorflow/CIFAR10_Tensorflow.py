@@ -21,7 +21,7 @@ def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=10000):
     elif system == 'Windows':
         cifar10_dir = '.\\cifar-10'
     else:
-        cifar10_dir = '/cifar-10'
+        cifar10_dir = './cifar-10'
     X_train, y_train, X_test, y_test = load_CIFAR10(cifar10_dir)
 
     # Subsample the data
@@ -73,30 +73,77 @@ def complex_model(X,y,is_training):
         
     # setup variables
     # 7x7x3 with 32 filters
-    Wconv1 = tf.get_variable("Wconv1", shape=[5, 5, 3, 32])
+    Wconv1 = tf.get_variable("Wconv1", shape=[7, 7, 3, 32])
     bconv1 = tf.get_variable("bconv1", shape=[32])
 
     # 32x32x3 -> conv -> 14x14x32 -> max_pool (2,2), strides = 2 -> 7 * 7 * 32 = 1152
 
-    W1 = tf.get_variable("W1", shape=[1568 , 1024])
+    W1 = tf.get_variable("W1", shape=[16 * 16 * 32 , 1024])
     b1 = tf.get_variable("b1", shape=[1024])
 
     W2 = tf.get_variable("W2", shape=[1024 , 10])
     b2 = tf.get_variable("b2", shape=[10])
 
     # define our graph (e.g. two_layer_convnet)
-    a1 = tf.nn.conv2d(X, Wconv1, strides=[1,2,2,1], padding='VALID') + bconv1
+    a1 = tf.nn.conv2d(X, Wconv1, strides=[1,1,1,1], padding='SAME') + bconv1
     h1 = tf.nn.relu(a1)
     
-    h1 = tf.contrib.layers.batch_norm(h1, center=True, scale=True, is_training=is_training)
+    # h1 = tf.contrib.layers.batch_norm(h1, center=True, scale=True, is_training=is_training)
     h1 = tf.nn.max_pool(h1, ksize=[1,2,2,1], strides=[1,2,2,1], padding='VALID')
+    print(h1.shape)
 
-    h1_flat = tf.reshape(h1,[-1,1568])
+    h1_flat = tf.reshape(h1,[-1,16 * 16 * 32])
     a2 = tf.matmul(h1_flat,W1) + b1
     h2 = tf.nn.relu(a2)
 
     y_out = tf.matmul(h2, W2) + b2
     return y_out
+
+def vgg_model(X, y, is_training):
+    '''
+    (3,3) 64 filters
+    '''
+    print("Running vgg_model")
+    # 7x7x3 with 32 filters
+    Wconv1 = tf.get_variable("Wconv1", shape=[3, 3, 3, 32])
+    bconv1 = tf.get_variable("bconv1", shape=[32])
+
+    Wconv2 = tf.get_variable("Wconv2", shape=[3, 3, 32, 32])
+    bconv2 = tf.get_variable("bconv2", shape=[32])
+
+    Wconv3 = tf.get_variable("Wconv3", shape=[3, 3, 32, 64])
+    bconv3 = tf.get_variable("bconv3", shape=[64])
+
+    Wconv4 = tf.get_variable("Wconv4", shape=[3, 3, 64, 64])
+    bconv4 = tf.get_variable("bconv4", shape=[64])
+
+    W1 = tf.get_variable("W1", shape=[4096, 1024])
+    b1 = tf.get_variable("b1", shape=[1024])
+
+    W2 = tf.get_variable("W2", shape=[1024, 10])
+    b2 = tf.get_variable("b2", shape=[10])
+
+    # CONV RELU CONV RELU MAX_POOLING
+    a1 = tf.nn.conv2d(X, Wconv1, strides=[1, 1, 1, 1], padding='SAME') + bconv1
+    h1 = tf.nn.relu(a1)
+    a1 = tf.nn.conv2d(h1, Wconv2, strides=[1, 1, 1, 1], padding='SAME') + bconv2
+    h1 = tf.nn.relu(a1)
+    h1 = tf.nn.max_pool(h1, ksize=[1,2,2,1], strides=[1,2,2,1], padding='VALID') # 16x16x64
+
+    a1 = tf.nn.conv2d(h1, Wconv3, strides=[1,1,1,1], padding='SAME') + bconv3
+    h1 = tf.nn.relu(a1)
+    a1 = tf.nn.conv2d(h1, Wconv4, strides=[1,1,1,1], padding='SAME') + bconv4
+    h1 = tf.nn.relu(a1)
+    h1 = tf.nn.max_pool(h1, ksize=[1,2,2,1], strides=[1,2,2,1], padding='VALID') # 8x8x128
+
+    h1_flat = tf.reshape(h1,[-1,4096])
+    a2 = tf.matmul(h1_flat,W1) + b1
+    h2 = tf.nn.relu(a2)
+
+    y_out = tf.matmul(h2,W2) + b2
+    
+    return y_out
+
 
 def main():
     # Invoke the above function to get our data.
@@ -118,7 +165,7 @@ def main():
     is_training = tf.placeholder(tf.bool)
 
     # y_out = simple_model(X,y)
-    y_out = complex_model(X,y,is_training=is_training)
+    y_out = vgg_model(X,y,is_training=is_training)
 
     # define our loss
     # total_loss = tf.losses.hinge_loss(tf.one_hot(y,10),logits=y_out)
@@ -128,6 +175,7 @@ def main():
     # define our optimizer
     # optimizer = tf.train.AdamOptimizer(5e-4) # select optimizer and set learning rate
     optimizer = tf.train.RMSPropOptimizer(1e-3)
+    # optimizer = tf.train.GradientDescentOptimizer(1e-4)
     train_step = optimizer.minimize(mean_loss)
 
     def run_model(session, predict, loss_val, Xd, yd,
@@ -195,7 +243,7 @@ def main():
         return total_loss,total_correct
 
     with tf.Session() as sess:
-        with tf.device("/gpu:0"): #"/cpu:0" or "/gpu:0" 
+        with tf.device("/cpu:0"): #"/cpu:0" or "/gpu:0" 
             sess.run(tf.global_variables_initializer())
             print('Training')
             run_model(sess,y_out,mean_loss,X_train,y_train,1,64,100,train_step,True)
